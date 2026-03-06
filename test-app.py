@@ -8,6 +8,7 @@ import cv2
 import tempfile
 from openai import OpenAI
 import json
+import time
 
 # --- 1. 页面基本设置 ---
 st.set_page_config(page_title="Vision Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -366,27 +367,33 @@ with tab_video:
             status_title_placeholder.markdown("#### ⚙️Tracking Status")
             progress_bar = progress_bar_placeholder.progress(0)
             
+            
+
             frame_count = 0
             while vf.isOpened():
                 ret, frame = vf.read()
                 if not ret:
                     break
                 
-                # 每读一帧，总帧数先加1，并更新进度条，保证进度条平滑推进
                 frame_count += 1
-                progress_bar.progress(frame_count / total_frames)
-                status_text.write(f"Processed: **{frame_count}** / {total_frames} frame")
-            
-                # 每 2 帧只处理 1 帧。这会让云端计算量直接减半，打通网络拥堵！           
-                if frame_count % 2 == 0:
+                
+                # ==========================================
+                # 🚀 【安全门卫】：如果不是偶数帧，直接略过！
+                # ==========================================
+                if frame_count % 2 != 0: 
                     continue
                 
-                # 加上 imgsz=480 参数，（不再按高清原图尺寸去强行推理）
+                # ------ 以下代码，每两帧才被允许执行一次 ------
+                
+                # 1. 更新进度条 (加了 min 防护，绝对不会报错)
+                progress_bar.progress(min(frame_count / total_frames, 1.0))
+                status_text.write(f"Processed: **{frame_count}** / {total_frames} frames")
+                
+                # 2. AI 追踪与画图 (锁定 480 尺寸)
                 results = model_custom.track(frame, persist=True, conf=conf_vid, tracker="botsort.yaml", imgsz=480, verbose=False)
                 annotated_frame = results[0].plot()
                 
-                # 压缩网页传输体积
-                # max_height = 650 改小到 480。
+                # 3. 画面体积压缩
                 max_height = 480
                 h, w = annotated_frame.shape[:2]
                 if h > max_height:
@@ -394,8 +401,20 @@ with tab_video:
                     annotated_frame = cv2.resize(annotated_frame, (int(w * scale), max_height))
                     
                 rgb_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+                
+                # 4. 把画面塞给前端显示
                 video_placeholder.image(rgb_frame, channels="RGB", use_container_width=False)
-            
+                
+                # ==========================================
+                # 🚀 【终极杀手锏：强制喘息机制】
+                # 强迫 AI 闭嘴 0.05 秒！把 CPU 让给 Streamlit，
+                # 让它有时间把刚才那张图片通过网络发给你的浏览器！
+                # ==========================================
+                time.sleep(0.05)
+                
+            # 循环跑完后的收尾动作
+            progress_bar.progress(1.0)
+            status_text.write(f"Processed: **{total_frames}** / {total_frames} frames")
             vf.release()
             st.success("Processing Completed")
             
