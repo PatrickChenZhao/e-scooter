@@ -11,3 +11,5 @@ pandas
 plotly
 # 调用 AI API (DeepSeek) 
 openai
+#追踪库
+lapx
