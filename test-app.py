@@ -345,7 +345,7 @@ with tab_video:
         total_frames = int(vf.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = int(vf.get(cv2.CAP_PROP_FPS))
         
-        st.info(f"📹 视频已加载：共 {total_frames} 帧 | 帧率: {fps} FPS")
+        st.info(f"Video loaded：total {total_frames} frames | Frame rate: {fps} FPS")
         
         vid_col1, vid_col2 = st.columns([3, 1], gap="large")
         
@@ -361,9 +361,9 @@ with tab_video:
         
         action_button_container = st.empty()
         
-        if action_button_container.button("🚀 启动跟踪引擎 (Start Tracking)", use_container_width=True):
+        if action_button_container.button("启动跟踪引擎 | Start Tracking)", use_container_width=True):
             action_button_container.empty()
-            status_title_placeholder.markdown("#### ⚙️ Tracking Status")
+            status_title_placeholder.markdown("#### ⚙️Tracking Status")
             progress_bar = progress_bar_placeholder.progress(0)
             
             frame_count = 0
@@ -372,10 +372,22 @@ with tab_video:
                 if not ret:
                     break
                 
-                results = model_custom.track(frame, persist=True, conf=conf_vid, tracker="botsort.yaml", verbose=False)
+                # 每读一帧，总帧数先加1，并更新进度条，保证进度条平滑推进
+                frame_count += 1
+                progress_bar.progress(frame_count / total_frames)
+                status_text.write(f"Processed: **{frame_count}** / {total_frames} frame")
+            
+                # 每 2 帧只处理 1 帧。这会让云端计算量直接减半，打通网络拥堵！           
+                if frame_count % 2 == 0:
+                    continue
+                
+                # 加上 imgsz=480 参数，（不再按高清原图尺寸去强行推理）
+                results = model_custom.track(frame, persist=True, conf=conf_vid, tracker="botsort.yaml", imgsz=480, verbose=False)
                 annotated_frame = results[0].plot()
                 
-                max_height = 650
+                # 压缩网页传输体积
+                # max_height = 650 改小到 480。
+                max_height = 480
                 h, w = annotated_frame.shape[:2]
                 if h > max_height:
                     scale = max_height / h
@@ -383,15 +395,11 @@ with tab_video:
                     
                 rgb_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
                 video_placeholder.image(rgb_frame, channels="RGB", use_container_width=False)
-                
-                frame_count += 1
-                progress_bar.progress(frame_count / total_frames)
-                status_text.write(f"已处理: **{frame_count}** / {total_frames} 帧")
             
             vf.release()
-            st.success("✅ 视频轨迹跟踪处理完毕！")
+            st.success("Processing Completed")
             
-            if action_button_container.button("🔄 重新分析 / Reset Dashboard", use_container_width=True):
+            if action_button_container.button("重新分析 / Reset Dashboard", use_container_width=True):
                 st.rerun() 
     else:
         st.warning("Please upload a video in the Control Panel.")
