@@ -377,30 +377,21 @@ with tab_video:
                 
                 frame_count += 1
                 
-                # ==========================================
-                # 🚀 狠招 3：断崖式跳帧（每 4 帧放行 1 帧）
-                # ==========================================
-                if frame_count % 4 != 0: 
+                #如果不是偶数帧，直接略过！
+                if frame_count % 2 != 0: 
                     continue
                 
-                # 1. 更新进度条 (按真实进度走)
+                # ------ 以下代码，每两帧才被允许执行一次 ------
+                
+                # 更新进度条
                 progress_bar.progress(min(frame_count / total_frames, 1.0))
                 status_text.write(f"Processed: **{frame_count}** / {total_frames} frames")
                 
-                # ==========================================
-                # 🚀 狠招 1 & 2：换用极速追踪器 ByteTrack + 极限尺寸 320
-                # ==========================================
-                results = model_custom.track(
-                    frame, 
-                    persist=True, 
-                    conf=conf_vid, 
-                    tracker="bytetrack.yaml", # 核心替换：抛弃 botsort，使用纯算力 bytetrack
-                    imgsz=320,                # 核心替换：极限压缩尺寸
-                    verbose=False
-                )
+                # 锁定 480 尺寸
+                results = model_custom.track(frame, persist=True, conf=conf_vid, tracker="botsort.yaml", imgsz=480, verbose=False)
                 annotated_frame = results[0].plot()
                 
-                # 画质压缩到 480 传输给前端
+                # 画面体积压缩
                 max_height = 480
                 h, w = annotated_frame.shape[:2]
                 if h > max_height:
@@ -408,11 +399,14 @@ with tab_video:
                     annotated_frame = cv2.resize(annotated_frame, (int(w * scale), max_height))
                     
                 rgb_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+                
+                # 把画面塞给前端显示
                 video_placeholder.image(rgb_frame, channels="RGB", use_container_width=False)
                 
-                # 仅保留 0.01 秒的极短通讯喘息时间
-                time.sleep(0.01)
+                # 强制休息
+                time.sleep(0.05)
                 
+            # 循环跑完后
             progress_bar.progress(1.0)
             status_text.write(f"Processed: **{total_frames}** / {total_frames} frames")
             vf.release()
