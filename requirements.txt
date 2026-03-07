@@ -1,15 +1,19 @@
 # 核心网页框架
 streamlit
-# 模型推理
-ultralytics
 # 用于云端无界面环境的 OpenCV 
 opencv-python-headless
+
+# 模型推理
+ultralytics
+
 # 数据处理与图表
 pillow
 numpy
 pandas
 plotly
+
 # 调用 AI API (DeepSeek) 
 openai
-#追踪库
+
+#追踪
 lapx
